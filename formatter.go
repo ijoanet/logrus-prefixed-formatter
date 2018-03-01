@@ -249,7 +249,7 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 		levelText = strings.ToUpper(levelText)
 	}
 
-	level := levelColor(fmt.Sprintf("%5s", levelText))
+	level := levelColor(levelText)
 	prefix := ""
 	message := entry.Message
 
@@ -273,11 +273,11 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 	} else {
 		var timestamp string
 		if !f.FullTimestamp {
-			timestamp = fmt.Sprintf("[%04d]", miniTS())
+			timestamp = fmt.Sprintf("%04d", miniTS())
 		} else {
-			timestamp = fmt.Sprintf("[%s]", entry.Time.Format(timestampFormat))
+			timestamp = fmt.Sprintf("%s", entry.Time.Format(timestampFormat))
 		}
-		fmt.Fprintf(b, "%s %s%s "+messageFormat, colorScheme.TimestampColor(timestamp), level, prefix, message)
+		fmt.Fprintf(b, "%s:%s -%s "+messageFormat, "[" + level + "]", colorScheme.TimestampColor(timestamp), prefix, message)
 	}
 	for _, k := range keys {
 		if k != "prefix" {
