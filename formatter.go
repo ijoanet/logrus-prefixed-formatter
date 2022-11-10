@@ -11,16 +11,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/mgutz/ansi"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const defaultTimestampFormat = time.RFC3339
+const defaultTimestampFormat = time.RFC3339Nano
 
 var (
-	baseTimestamp      time.Time    = time.Now()
-	defaultColorScheme *ColorScheme = &ColorScheme{
+	baseTimestamp      = time.Now()
+	defaultColorScheme = &ColorScheme{
 		InfoLevelStyle:  "green",
 		WarnLevelStyle:  "yellow",
 		ErrorLevelStyle: "red",
@@ -29,8 +29,9 @@ var (
 		DebugLevelStyle: "blue",
 		PrefixStyle:     "cyan",
 		TimestampStyle:  "black+h",
+		CallerStyle:     "black+h",
 	}
-	noColorsColorScheme *compiledColorScheme = &compiledColorScheme{
+	noColorsColorScheme = &compiledColorScheme{
 		InfoLevelColor:  ansi.ColorFunc(""),
 		WarnLevelColor:  ansi.ColorFunc(""),
 		ErrorLevelColor: ansi.ColorFunc(""),
@@ -39,14 +40,16 @@ var (
 		DebugLevelColor: ansi.ColorFunc(""),
 		PrefixColor:     ansi.ColorFunc(""),
 		TimestampColor:  ansi.ColorFunc(""),
+		CallerColor:     ansi.ColorFunc(""),
 	}
-	defaultCompiledColorScheme *compiledColorScheme = compileColorScheme(defaultColorScheme)
+	defaultCompiledColorScheme = compileColorScheme(defaultColorScheme)
 )
 
 func miniTS() int {
 	return int(time.Since(baseTimestamp) / time.Second)
 }
 
+// ColorScheme - Defines colors used pon colorizing
 type ColorScheme struct {
 	InfoLevelStyle  string
 	WarnLevelStyle  string
@@ -56,6 +59,7 @@ type ColorScheme struct {
 	DebugLevelStyle string
 	PrefixStyle     string
 	TimestampStyle  string
+	CallerStyle     string
 }
 
 type compiledColorScheme struct {
@@ -67,8 +71,10 @@ type compiledColorScheme struct {
 	DebugLevelColor func(string) string
 	PrefixColor     func(string) string
 	TimestampColor  func(string) string
+	CallerColor     func(string) string
 }
 
+// TextFormatter - Setting for the formatting of the logs
 type TextFormatter struct {
 	// Set to true to bypass checking for a TTY before outputting colors.
 	ForceColors bool
@@ -110,6 +116,9 @@ type TextFormatter struct {
 	// Its default value is zero, which means no padding will be applied for msg.
 	SpacePadding int
 
+	// Show from which functions comes the log
+	ShowCaller bool
+
 	// Color scheme to use.
 	colorScheme *compiledColorScheme
 
@@ -139,6 +148,7 @@ func compileColorScheme(s *ColorScheme) *compiledColorScheme {
 		DebugLevelColor: getCompiledColor(s.DebugLevelStyle, defaultColorScheme.DebugLevelStyle),
 		PrefixColor:     getCompiledColor(s.PrefixStyle, defaultColorScheme.PrefixStyle),
 		TimestampColor:  getCompiledColor(s.TimestampStyle, defaultColorScheme.TimestampStyle),
+		CallerColor:     getCompiledColor(s.CallerStyle, defaultColorScheme.CallerStyle),
 	}
 }
 
@@ -160,13 +170,14 @@ func (f *TextFormatter) checkIfTerminal(w io.Writer) bool {
 	}
 }
 
+// SetColorScheme - Used to customize which colors use for each Log Level
 func (f *TextFormatter) SetColorScheme(colorScheme *ColorScheme) {
 	f.colorScheme = compileColorScheme(colorScheme)
 }
 
 func (f *TextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var b *bytes.Buffer
-	var keys []string = make([]string, 0, len(entry.Data))
+	keys := make([]string, 0, len(entry.Data))
 	for k := range entry.Data {
 		keys = append(keys, k)
 	}
@@ -209,6 +220,12 @@ func (f *TextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			f.appendKeyValue(b, "time", entry.Time.Format(timestampFormat), true)
 		}
 		f.appendKeyValue(b, "level", entry.Level.String(), true)
+
+		if f.ShowCaller {
+			f.appendKeyValue(b, "file", entry.Caller.File, true)
+
+			f.appendKeyValue(b, "func", entry.Caller.Function, true)
+		}
 		if entry.Message != "" {
 			f.appendKeyValue(b, "msg", entry.Message, lastKeyIdx >= 0)
 		}
@@ -242,7 +259,7 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 	if entry.Level != logrus.WarnLevel {
 		levelText = entry.Level.String()
 	} else {
-		levelText = "warn"
+		levelText = "WARN"
 	}
 
 	if !f.DisableUppercase {
@@ -252,6 +269,11 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 	level := levelColor(levelText)
 	prefix := ""
 	message := entry.Message
+	caller := ""
+
+	if f.ShowCaller {
+		caller = entry.Caller.Function
+	}
 
 	if prefixValue, ok := entry.Data["prefix"]; ok {
 		prefix = colorScheme.PrefixColor(" " + prefixValue.(string) + ":")
@@ -269,15 +291,15 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 	}
 
 	if f.DisableTimestamp {
-		fmt.Fprintf(b, "%s%s "+messageFormat, level, prefix, message)
+		fmt.Fprintf(b, "%s%s:%s "+messageFormat, level, colorScheme.CallerColor(caller), prefix, message)
 	} else {
 		var timestamp string
 		if !f.FullTimestamp {
 			timestamp = fmt.Sprintf("%04d", miniTS())
 		} else {
-			timestamp = fmt.Sprintf("%s", entry.Time.Format(timestampFormat))
+			timestamp = fmt.Sprint(entry.Time.Format(timestampFormat))
 		}
-		fmt.Fprintf(b, "%s:%s -%s "+messageFormat, "[" + level + "]", colorScheme.TimestampColor(timestamp), prefix, message)
+		fmt.Fprintf(b, "%s[%s]%s:%s "+messageFormat, colorScheme.TimestampColor(timestamp), level, colorScheme.CallerColor(caller), prefix, message)
 	}
 	for _, k := range keys {
 		if k != "prefix" {
@@ -304,7 +326,7 @@ func (f *TextFormatter) needsQuoting(text string) bool {
 
 func extractPrefix(msg string) (string, string) {
 	prefix := ""
-	regex := regexp.MustCompile("^\\[(.*?)\\]")
+	regex := regexp.MustCompile(`^\[(.*?)\]`)
 	if regex.MatchString(msg) {
 		match := regex.FindString(msg)
 		prefix, msg = match[1:len(match)-1], strings.TrimSpace(msg[len(match):])
@@ -345,12 +367,12 @@ func (f *TextFormatter) appendValue(b *bytes.Buffer, value interface{}) {
 // This is to not silently overwrite `time`, `msg` and `level` fields when
 // dumping it. If this code wasn't there doing:
 //
-//  logrus.WithField("level", 1).Info("hello")
+//	logrus.WithField("level", 1).Info("hello")
 //
 // would just silently drop the user provided level. Instead with this code
 // it'll be logged as:
 //
-//  {"level": "info", "fields.level": 1, "msg": "hello", "time": "..."}
+//	{"level": "info", "fields.level": 1, "msg": "hello", "time": "..."}
 func prefixFieldClashes(data logrus.Fields) {
 	if t, ok := data["time"]; ok {
 		data["fields.time"] = t

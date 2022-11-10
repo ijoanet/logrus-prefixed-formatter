@@ -1,4 +1,5 @@
 # Logrus Prefixed Log Formatter
+
 [![Build Status](https://travis-ci.org/x-cray/logrus-prefixed-formatter.svg?branch=master)](https://travis-ci.org/x-cray/logrus-prefixed-formatter)
 
 [Logrus](https://github.com/sirupsen/logrus) formatter mainly based on original `logrus.TextFormatter` but with slightly
@@ -21,45 +22,59 @@ exit status 1
 ```
 
 ## Installation
+
 To install formatter, use `go get`:
 
 ```sh
-$ go get github.com/x-cray/logrus-prefixed-formatter
+go get github.com/x-cray/logrus-prefixed-formatter
 ```
 
 ## Usage
+
 Here is how it should be used:
 
 ```go
 package main
 
 import (
-	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+ "github.com/sirupsen/logrus"
+ prefixed "github.com/ijoanet/logrus-prefixed-formatter"
 )
 
 var log = logrus.New()
 
 func init() {
-	log.Formatter = new(prefixed.TextFormatter)
-	log.Level = logrus.DebugLevel
+ formatter := &TextFormatter{
+   FullTimestamp: true,
+   ForceColors:   true,
+   ShowCaller:    reportCaller,
+  }
+
+  formatter.SetColorScheme(&ColorScheme{
+   InfoLevelStyle:  "blue",
+   DebugLevelStyle: "green",
+   PrefixStyle:     "black+h",
+  })
+  logger.SetFormatter(formatter)
+ log.Level = logrus.DebugLevel
 }
 
 func main() {
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-		"animal": "walrus",
-		"number": 8,
-	}).Debug("Started observing beach")
+ log.WithFields(logrus.Fields{
+  "prefix": "main",
+  "animal": "walrus",
+  "number": 8,
+ }).Debug("Started observing beach")
 
-	log.WithFields(logrus.Fields{
-		"prefix":      "sensor",
-		"temperature": -4,
-	}).Info("Temperature changes")
+ log.WithFields(logrus.Fields{
+  "prefix":      "sensor",
+  "temperature": -4,
+ }).Info("Temperature changes")
 }
 ```
 
 ## API
+
 `prefixed.TextFormatter` exposes the following fields and methods.
 
 ### Fields
@@ -75,12 +90,14 @@ func main() {
 * `QuoteEmptyFields bool` — wrap empty fields in quotes if true.
 * `QuoteCharacter string` — can be set to the override the default quoting character `"` with something else. For example: `'`, or `` ` ``.
 * `SpacePadding int` — pad msg field with spaces on the right for display. The value for this parameter will be the size of padding. Its default value is zero, which means no padding will be applied.
+* `ShowCaller bool` - Shows which function comes the log
 
 ### Methods
 
 #### `SetColorScheme(colorScheme *prefixed.ColorScheme)`
 
 Sets an alternative color scheme for colored output. `prefixed.ColorScheme` struct supports the following fields:
+
 * `InfoLevelStyle string` — info level style.
 * `WarnLevelStyle string` — warn level style.
 * `ErrorLevelStyle string` — error style.
@@ -89,6 +106,7 @@ Sets an alternative color scheme for colored output. `prefixed.ColorScheme` stru
 * `DebugLevelStyle string` — debug level style.
 * `PrefixStyle string` — prefix style.
 * `TimestampStyle string` — timestamp style.
+* `CallerStyle string` — caller style.
 
 Color styles should be specified using [mgutz/ansi](https://github.com/mgutz/ansi#style-format) style syntax. For example, here is the default theme:
 
@@ -101,6 +119,7 @@ PanicLevelStyle: "red",
 DebugLevelStyle: "blue",
 PrefixStyle:     "cyan",
 TimestampStyle:  "black+h"
+CallerStyle:  "black+h"
 ```
 
 It's not necessary to specify all colors when changing color scheme if you want to change just specific ones:
@@ -113,4 +132,5 @@ formatter.SetColorScheme(&prefixed.ColorScheme{
 ```
 
 # License
+
 MIT
