@@ -26,7 +26,7 @@ exit status 1
 To install formatter, use `go get`:
 
 ```sh
-go get github.com/x-cray/logrus-prefixed-formatter
+go get github.com/ijoanet/logrus-prefixed-formatter
 ```
 
 ## Usage
