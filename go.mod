@@ -7,7 +7,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.6
 	github.com/sirupsen/logrus v1.9.0
-	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.8.0
 )
 
