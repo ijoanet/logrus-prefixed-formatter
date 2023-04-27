@@ -272,7 +272,11 @@ func (f *TextFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys 
 	caller := ""
 
 	if f.ShowCaller {
-		caller = entry.Caller.Function
+		if entry.Caller == nil {
+			caller = "caller not defined"
+		} else {
+			caller = entry.Caller.Function
+		}
 	}
 
 	if prefixValue, ok := entry.Data["prefix"]; ok {
